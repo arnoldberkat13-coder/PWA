@@ -3,423 +3,349 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenCV.js Face Detection & Image Processing</title>
-    <!-- Tailwind CSS for styling -->
+    <title>OpenCV.js Object Detection & Image Processing</title>
+    <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for icons -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Custom scrollbar styling for control panels */
+        /* Custom scrollbar for control panels */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
+            background: #1f2937;
         }
         ::-webkit-scrollbar-thumb {
-            background: rgba(51, 65, 85, 0.8);
-            border-radius: 4px;
+            background: #4b5563;
+            border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(71, 85, 105, 1);
+            background: #6b7280;
+        }
+        /* Canvas mirroring for natural selfie webcam view */
+        .mirror {
+            transform: scaleX(-1);
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex flex-col">
 
-    <!-- Header Navigation -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 p-2 rounded-lg text-white">
-                    <i class="fa-solid fa-eye text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg leading-tight">Vision Lab</h1>
-                    <p class="text-xs text-slate-400">OpenCV.js Haar Cascade & Morphological Optimization</p>
-                </div>
+    <!-- Header Navbar -->
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex flex-wrap justify-between items-center shadow-lg">
+        <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-eye text-indigo-500 text-2xl"></i>
+            <h1 class="text-xl font-bold tracking-wide text-white">VisionLab <span class="text-xs px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 border border-indigo-700">OpenCV.js + Haar Cascade</span></h1>
+        </div>
+        <!-- Status Indicator -->
+        <div class="flex items-center space-x-4 mt-2 sm:mt-0">
+            <div id="statusBadge" class="flex items-center space-x-2 bg-yellow-900/50 text-yellow-300 border border-yellow-700/50 px-3 py-1 rounded-full text-xs font-semibold">
+                <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+                <span id="statusText">Loading OpenCV.js...</span>
             </div>
-            
-            <!-- Status Badge -->
-            <div id="cvStatusBadge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                </span>
-                <span id="cvStatusText">Loading OpenCV.js...</span>
+            <div class="bg-gray-700 text-gray-300 text-xs px-3 py-1 rounded-md flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-emerald-400"></i>
+                <span>FPS: <strong id="fpsVal" class="text-emerald-400">0</strong></span>
             </div>
         </div>
     </header>
 
     <!-- Main Content Area -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <main class="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
+        
+        <!-- Left/Top: Display Viewports (8 cols on LG) -->
+        <div class="lg:col-span-8 flex flex-col gap-4">
             
-            <!-- Left Column: Video Viewports & Canvas -->
-            <div class="lg:col-span-8 flex flex-col gap-4">
+            <!-- Video & Canvas Containers -->
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 shadow-xl flex flex-col items-center justify-center relative min-h-[380px] overflow-hidden">
                 
-                <!-- Main Canvas Viewport -->
-                <div class="relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl aspect-video flex items-center justify-center group">
-                    
-                    <!-- Hidden Raw Video element -->
-                    <video id="webcam" class="hidden" autoplay playsinline muted></video>
-                    
-                    <!-- Display Canvas -->
-                    <canvas id="canvasOutput" class="w-full h-full object-contain"></canvas>
-                    
-                    <!-- Secondary Processed Stream Preview (Small Overlay) -->
-                    <div class="absolute bottom-4 right-4 w-44 sm:w-56 aspect-video bg-slate-950/90 rounded-lg border border-slate-700/80 overflow-hidden shadow-lg transition-transform duration-300 group-hover:scale-105">
-                        <div class="text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-slate-800/80 text-slate-300 border-b border-slate-700/50 flex justify-between">
-                            <span>Preprocessed View</span>
-                            <span id="preprocessTag">Threshold</span>
-                        </div>
-                        <canvas id="canvasProcessed" class="w-full h-full object-contain"></canvas>
-                    </div>
+                <!-- Hidden Video Element for Stream Input -->
+                <video id="videoInput" class="hidden" playsinline></video>
 
-                    <!-- Overlay Stats / FPS counter -->
-                    <div class="absolute top-4 left-4 flex gap-2">
-                        <div class="bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-emerald-400 flex items-center gap-2">
-                            <i class="fa-solid fa-gauge-high"></i>
-                            <span id="fpsCounter">0</span> FPS
-                        </div>
-                        <div class="bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono text-indigo-400 flex items-center gap-2">
-                            <i class="fa-solid fa-face-smile"></i>
-                            <span id="detectedCount">0</span> Detected
-                        </div>
-                    </div>
-
-                    <!-- WebCam Disabled State Overlay -->
-                    <div id="placeholderOverlay" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center p-6 text-center z-10">
-                        <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center text-slate-500 mb-4 text-2xl">
-                            <i class="fa-solid fa-video-slash"></i>
-                        </div>
-                        <h3 class="text-base font-semibold text-slate-200">Camera Access Required</h3>
-                        <p class="text-sm text-slate-400 max-w-md mt-1 mb-6">Start camera stream once OpenCV.js has finished initializing to test real-time object detection.</p>
-                        <button id="startCamBtn" disabled class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-sm font-semibold rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
-                            <i class="fa-solid fa-play"></i> Start Camera
-                        </button>
+                <!-- Processing Output Canvas -->
+                <div class="relative w-full max-w-2xl aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center border border-gray-700">
+                    <canvas id="canvasOutput" class="w-full h-full object-contain mirror"></canvas>
+                    
+                    <!-- Loading Overlay -->
+                    <div id="canvasOverlay" class="absolute inset-0 bg-gray-900/90 flex flex-col items-center justify-center gap-3 z-10">
+                        <i class="fa-solid fa-spinner animate-spin text-4xl text-indigo-500"></i>
+                        <p id="overlayMessage" class="text-sm font-medium text-gray-300">Initializing webcam and OpenCV models...</p>
                     </div>
                 </div>
 
-                <!-- Camera Controls & Actions -->
-                <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <button id="toggleCamBtn" disabled class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-                            <i class="fa-solid fa-power-off"></i> Stop Stream
-                        </button>
-                        <button id="switchCamBtn" disabled class="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm font-medium rounded-lg transition-colors">
-                            <i class="fa-solid fa-camera-rotate"></i>
-                        </button>
-                    </div>
-
-                    <div class="flex items-center gap-4 text-sm">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="showBboxes" checked class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
-                            <span class="text-slate-300 font-medium">Draw Bounding Boxes</span>
-                        </label>
-                    </div>
+                <!-- Live Stream Controls -->
+                <div class="mt-4 flex flex-wrap gap-3 justify-center w-full">
+                    <button id="toggleCamBtn" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition">
+                        <i class="fa-solid fa-video"></i> Start Camera
+                    </button>
+                    <button id="toggleDetectionBtn" disabled class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition">
+                        <i class="fa-solid fa-user-check"></i> Toggle Haar Cascade
+                    </button>
+                    <button id="toggleMirrorBtn" class="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition">
+                        <i class="fa-solid fa-arrows-left-right"></i> Flip Mirror
+                    </button>
                 </div>
             </div>
 
-            <!-- Right Column: Control Dashboard -->
-            <div class="lg:col-span-4 flex flex-col gap-5">
+            <!-- Preprocessing View Legend / Quick Guide -->
+            <div class="bg-gray-800/80 rounded-xl p-4 border border-gray-700 text-xs text-gray-400 flex flex-wrap justify-between gap-2">
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-indigo-400 text-[8px]"></i> 1. Grayscale Conversion</span>
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-indigo-400 text-[8px]"></i> 2. Thresholding / Binarization</span>
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-indigo-400 text-[8px]"></i> 3. Morphological Filter</span>
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-emerald-400 text-[8px]"></i> 4. Haar Cascade Object Overlay</span>
+            </div>
+        </div>
+
+        <!-- Right/Bottom: Image Processing Controls (4 cols on LG) -->
+        <div class="lg:col-span-4 flex flex-col gap-4">
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-xl flex flex-col gap-5 h-full overflow-y-auto max-h-[750px]">
                 
-                <!-- Tab Controls for Configuration -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-5">
+                <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-gray-700 pb-3">
+                    <i class="fa-solid fa-sliders text-indigo-400"></i> Processing Pipeline Controls
+                </h2>
+
+                <!-- Pipeline Enable Switches -->
+                <div class="space-y-3">
+                    <label class="flex items-center justify-between cursor-pointer bg-gray-750 p-2.5 rounded-lg border border-gray-700 hover:bg-gray-700/50 transition">
+                        <span class="text-xs font-semibold text-gray-200">Enable Thresholding</span>
+                        <input type="checkbox" id="enableThreshold" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 bg-gray-900 border-gray-600">
+                    </label>
+
+                    <label class="flex items-center justify-between cursor-pointer bg-gray-750 p-2.5 rounded-lg border border-gray-700 hover:bg-gray-700/50 transition">
+                        <span class="text-xs font-semibold text-gray-200">Enable Morphology</span>
+                        <input type="checkbox" id="enableMorph" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 bg-gray-900 border-gray-600">
+                    </label>
+
+                    <label class="flex items-center justify-between cursor-pointer bg-gray-750 p-2.5 rounded-lg border border-gray-700 hover:bg-gray-700/50 transition">
+                        <span class="text-xs font-semibold text-gray-200">Display Processed Mask</span>
+                        <input type="checkbox" id="showMaskOnly" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 bg-gray-900 border-gray-600">
+                    </label>
+                </div>
+
+                <!-- 1. Thresholding Settings -->
+                <div class="bg-gray-900/50 p-3.5 rounded-lg border border-gray-700/60 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider">1. Threshold Settings</span>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs text-gray-300">Type</label>
+                        <select id="threshType" class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500">
+                            <option value="BINARY">Binary Threshold</option>
+                            <option value="BINARY_INV">Binary Inverted</option>
+                            <option value="OTSU">Otsu Automatic Binarization</option>
+                        </select>
+                    </div>
+
+                    <div id="threshValContainer" class="space-y-1">
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>Cutoff Value</span>
+                            <span id="threshValueLabel" class="text-indigo-300 font-mono">128</span>
+                        </div>
+                        <input type="range" id="threshValue" min="0" max="255" value="128" class="w-full accent-indigo-500 bg-gray-700 h-1.5 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- 2. Morphological Settings -->
+                <div class="bg-gray-900/50 p-3.5 rounded-lg border border-gray-700/60 space-y-3">
+                    <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider block">2. Morphological Operation</span>
                     
-                    <!-- Section 1: Haar Cascade Model Selection -->
-                    <div>
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                                <i class="fa-solid fa-microchip"></i> 1. Detection Model
-                            </h2>
-                        </div>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-400 mb-1">Classifier Model</label>
-                                <select id="cascadeModelSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:border-indigo-500">
-                                    <option value="haarcascade_frontalface_default.xml">Frontal Face Default</option>
-                                    <option value="haarcascade_eye.xml">Eye Detection</option>
-                                </select>
-                            </div>
-
-                            <!-- Scale Factor Slider -->
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-slate-400">Scale Factor</span>
-                                    <span id="scaleFactorVal" class="text-indigo-400 font-mono">1.10</span>
-                                </div>
-                                <input type="range" id="scaleFactor" min="1.05" max="1.50" step="0.05" value="1.10" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
-                            </div>
-
-                            <!-- Min Neighbors Slider -->
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-slate-400">Min Neighbors</span>
-                                    <span id="minNeighborsVal" class="text-indigo-400 font-mono">3</span>
-                                </div>
-                                <input type="range" id="minNeighbors" min="1" max="10" step="1" value="3" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
-                            </div>
-                        </div>
+                    <div class="space-y-1">
+                        <label class="text-xs text-gray-300">Operation Type</label>
+                        <select id="morphOp" class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500">
+                            <option value="MORPH_OPEN">Opening (Noise Reduction)</option>
+                            <option value="MORPH_CLOSE">Closing (Hole Filling)</option>
+                            <option value="MORPH_ERODE">Erosion (Shrink Features)</option>
+                            <option value="MORPH_DILATE">Dilation (Expand Features)</option>
+                        </select>
                     </div>
 
-                    <hr class="border-slate-800">
-
-                    <!-- Section 2: Image Processing Controls -->
-                    <div>
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                                <i class="fa-solid fa-[#00ffcc] fa-sliders"></i> 2. Preprocessing
-                            </h2>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="enablePreprocessing" class="sr-only peer">
-                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                            </label>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>Kernel Size (Odd)</span>
+                            <span id="kernelSizeLabel" class="text-indigo-300 font-mono">3x3</span>
                         </div>
+                        <input type="range" id="kernelSize" min="3" max="15" step="2" value="3" class="w-full accent-indigo-500 bg-gray-700 h-1.5 rounded-lg cursor-pointer">
+                    </div>
+                </div>
 
-                        <!-- Options Wrapper -->
-                        <div id="preprocessingControls" class="space-y-4 opacity-50 pointer-events-none transition-opacity">
-                            
-                            <!-- Thresholding Options -->
-                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-3">
-                                <span class="text-xs font-semibold text-slate-300 block border-b border-slate-800 pb-1">Thresholding</span>
-                                
-                                <div>
-                                    <label class="block text-[11px] font-medium text-slate-400 mb-1">Type</label>
-                                    <select id="thresholdType" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                                        <option value="none">None (Grayscale Only)</option>
-                                        <option value="binary">Binary Threshold</option>
-                                        <option value="binary_inv">Binary Inverted</option>
-                                        <option value="otsu">Otsu Binarization</option>
-                                        <option value="adaptive">Adaptive Gaussian</option>
-                                    </select>
-                                </div>
+                <!-- 3. Haar Cascade Parameters -->
+                <div class="bg-gray-900/50 p-3.5 rounded-lg border border-gray-700/60 space-y-3">
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider block">3. Haar Classifier Parameters</span>
 
-                                <!-- Threshold Value Slider -->
-                                <div id="threshValContainer">
-                                    <div class="flex justify-between text-xs mb-1">
-                                        <span class="text-slate-400">Cutoff Value</span>
-                                        <span id="threshValText" class="text-indigo-400 font-mono">120</span>
-                                    </div>
-                                    <input type="range" id="threshVal" min="0" max="255" value="120" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
-                                </div>
-                            </div>
-
-                            <!-- Morphological Operations -->
-                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-3">
-                                <span class="text-xs font-semibold text-slate-300 block border-b border-slate-800 pb-1">Morphology</span>
-                                
-                                <div>
-                                    <label class="block text-[11px] font-medium text-slate-400 mb-1">Operation</label>
-                                    <select id="morphType" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                                        <option value="none">None</option>
-                                        <option value="erode">Erosion</option>
-                                        <option value="dilate">Dilation</option>
-                                        <option value="open">Opening (Noise Reduction)</option>
-                                        <option value="close">Closing (Fill Holes)</option>
-                                    </select>
-                                </div>
-
-                                <!-- Kernel Size Slider -->
-                                <div>
-                                    <div class="flex justify-between text-xs mb-1">
-                                        <span class="text-slate-400">Kernel Size</span>
-                                        <span id="kernelSizeVal" class="text-indigo-400 font-mono">3x3</span>
-                                    </div>
-                                    <input type="range" id="kernelSize" min="1" max="15" step="2" value="3" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
-                                </div>
-                            </div>
-
-                            <!-- Apply Processed Image directly to Classifier Target -->
-                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                                <div class="pr-2">
-                                    <div class="text-xs font-semibold text-slate-200">Feed Processed Image to Detector</div>
-                                    <div class="text-[10px] text-slate-400">Pass thresholded/morphed binary image directly to Haar Cascade detector.</div>
-                                </div>
-                                <input type="checkbox" id="feedProcessedToCascade" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
-                            </div>
-
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>Scale Factor</span>
+                            <span id="scaleFactorLabel" class="text-emerald-300 font-mono">1.10</span>
                         </div>
+                        <input type="range" id="scaleFactor" min="1.05" max="1.5" step="0.05" value="1.10" class="w-full accent-emerald-500 bg-gray-700 h-1.5 rounded-lg cursor-pointer">
                     </div>
 
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>Min Neighbors</span>
+                            <span id="minNeighborsLabel" class="text-emerald-300 font-mono">3</span>
+                        </div>
+                        <input type="range" id="minNeighbors" min="1" max="10" step="1" value="3" class="w-full accent-emerald-500 bg-gray-700 h-1.5 rounded-lg cursor-pointer">
+                    </div>
                 </div>
 
             </div>
-
         </div>
     </main>
 
-    <!-- Async Loading OpenCV.js -->
-    <script>
-        // Global variables & state tracking
-        let cvReady = false;
-        let streaming = false;
-        let video = null;
-        let cap = null;
-        let srcMat = null;
-        let grayMat = null;
-        let processedMat = null;
-        let facesMat = null;
-        let classifier = null;
-        let animFrameId = null;
+    <!-- Footer -->
+    <footer class="bg-gray-800 border-t border-gray-700 py-3 text-center text-xs text-gray-400 mt-auto">
+        Single-File OpenCV.js Computer Vision Pipeline &bull; HTML5 & WebRTC
+    </footer>
 
-        // FPS tracking
+    <!-- Async Load OpenCV.js Library -->
+    <script async src="https://docs.opencv.org/4.7.0/opencv.js" onload="onOpenCvReady();" onerror="onOpenCvError();"></script>
+
+    <!-- Application Script -->
+    <script>
+        // State variables
+        let video = document.getElementById('videoInput');
+        let canvas = document.getElementById('canvasOutput');
+        let ctx = canvas.getContext('2d');
+        
+        let isCameraActive = false;
+        let isDetectionEnabled = true;
+        let isMirrored = true;
+        let classifier = null;
+        let isOpenCvReady = false;
+
+        // Processing variables & Matrices
+        let cap = null;
+        let src = null;
+        let gray = null;
+        let processedMat = null;
+        let faces = null;
+
+        // Performance tracking
         let lastFrameTime = performance.now();
         let frameCount = 0;
+        let currentFps = 0;
 
-        // Pre-loaded Haar Cascade URLs
-        const CASCADE_FILES = {
-            'haarcascade_frontalface_default.xml': 'https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml',
-            'haarcascade_eye.xml': 'https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_eye.xml'
-        };
+        // Cascade Classifier XML URL
+        const HAAR_CASCADE_URL = 'https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml';
+        const HAAR_CASCADE_FILENAME = 'haarcascade_frontalface_default.xml';
 
-        // UI Element References
-        const elements = {
-            statusBadge: document.getElementById('cvStatusBadge'),
-            statusText: document.getElementById('cvStatusText'),
-            startCamBtn: document.getElementById('startCamBtn'),
-            toggleCamBtn: document.getElementById('toggleCamBtn'),
-            switchCamBtn: document.getElementById('switchCamBtn'),
-            placeholderOverlay: document.getElementById('placeholderOverlay'),
-            webcam: document.getElementById('webcam'),
-            canvasOutput: document.getElementById('canvasOutput'),
-            canvasProcessed: document.getElementById('canvasProcessed'),
-            fpsCounter: document.getElementById('fpsCounter'),
-            detectedCount: document.getElementById('detectedCount'),
-            scaleFactor: document.getElementById('scaleFactor'),
-            scaleFactorVal: document.getElementById('scaleFactorVal'),
-            minNeighbors: document.getElementById('minNeighbors'),
-            minNeighborsVal: document.getElementById('minNeighborsVal'),
-            cascadeModelSelect: document.getElementById('cascadeModelSelect'),
-            enablePreprocessing: document.getElementById('enablePreprocessing'),
-            preprocessingControls: document.getElementById('preprocessingControls'),
-            thresholdType: document.getElementById('thresholdType'),
-            threshVal: document.getElementById('threshVal'),
-            threshValText: document.getElementById('threshValText'),
-            threshValContainer: document.getElementById('threshValContainer'),
-            morphType: document.getElementById('morphType'),
-            kernelSize: document.getElementById('kernelSize'),
-            kernelSizeVal: document.getElementById('kernelSizeVal'),
-            showBboxes: document.getElementById('showBboxes'),
-            feedProcessedToCascade: document.getElementById('feedProcessedToCascade'),
-            preprocessTag: document.getElementById('preprocessTag')
-        };
-
-        // Initialize Callbacks when OpenCV.js attaches
+        // OpenCV.js Ready Callback
         function onOpenCvReady() {
-            if (cv.getBuildInformation) {
-                initApp();
-            } else {
-                // WASM might still be compiling
-                cv['onRuntimeInitialized'] = () => {
-                    initApp();
-                };
-            }
-        }
-
-        async function initApp() {
-            elements.statusText.textContent = "Loading Cascade Models...";
+            console.log('OpenCV.js successfully loaded.');
+            document.getElementById('statusText').innerText = 'Downloading Haar Cascade Model...';
             
-            try {
-                // Download default cascade classifier file into Emscripten Virtual File System (FS)
-                await loadCascadeFile('haarcascade_frontalface_default.xml');
-                
-                // Initialize Classifier
-                classifier = new cv.CascadeClassifier();
-                classifier.load('haarcascade_frontalface_default.xml');
-
-                // UI Status Update
-                cvReady = true;
-                elements.statusBadge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-                elements.statusText.textContent = "OpenCV.js Ready";
-                elements.startCamBtn.disabled = false;
-                elements.toggleCamBtn.disabled = false;
-
-                setupEventListeners();
-            } catch (err) {
-                console.error("Initialization error:", err);
-                elements.statusBadge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20";
-                elements.statusText.textContent = "Error Loading Models";
-            }
-        }
-
-        // Helper function to fetch cascade XML and write it to OpenCV virtual filesystem
-        async function loadCascadeFile(fileName) {
-            const url = CASCADE_FILES[fileName];
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`Failed to fetch cascade ${fileName}`);
-            const buffer = await response.arrayBuffer();
-            const data = new Uint8Array(buffer);
-            cv.FS_createDataFile('/', fileName, data, true, false, false);
-        }
-
-        function setupEventListeners() {
-            // Camera Buttons
-            elements.startCamBtn.addEventListener('click', startCamera);
-            elements.toggleCamBtn.addEventListener('click', stopCamera);
-
-            // Cascade Model Selector
-            elements.cascadeModelSelect.addEventListener('change', async (e) => {
-                const modelName = e.target.value;
-                elements.statusText.textContent = `Loading ${modelName}...`;
+            // Download Cascade XML file into Emscripten Virtual File System (FS)
+            downloadCascadeModel(HAAR_CASCADE_URL, HAAR_CASCADE_FILENAME, () => {
                 try {
-                    // Load if not already fetched
-                    try {
-                        cv.FS_stat(`/${modelName}`);
-                    } catch {
-                        await loadCascadeFile(modelName);
-                    }
-                    classifier.load(modelName);
-                    elements.statusText.textContent = "OpenCV.js Ready";
+                    classifier = new cv.CascadeClassifier();
+                    classifier.load(HAAR_CASCADE_FILENAME);
+
+                    isOpenCvReady = true;
+                    document.getElementById('statusBadge').className = 'flex items-center space-x-2 bg-emerald-900/50 text-emerald-300 border border-emerald-700/50 px-3 py-1 rounded-full text-xs font-semibold';
+                    document.getElementById('statusBadge').children[0].className = 'w-2 h-2 rounded-full bg-emerald-400';
+                    document.getElementById('statusText').innerText = 'System Ready';
+                    
+                    document.getElementById('canvasOverlay').classList.add('hidden');
+                    document.getElementById('toggleCamBtn').disabled = false;
+                    document.getElementById('toggleDetectionBtn').disabled = false;
                 } catch (err) {
-                    console.error("Failed to switch cascade:", err);
-                    elements.statusText.textContent = "Failed to load model";
-                }
-            });
-
-            // Input Sliders Controls
-            elements.scaleFactor.addEventListener('input', (e) => {
-                elements.scaleFactorVal.textContent = parseFloat(e.target.value).toFixed(2);
-            });
-
-            elements.minNeighbors.addEventListener('input', (e) => {
-                elements.minNeighborsVal.textContent = e.target.value;
-            });
-
-            elements.threshVal.addEventListener('input', (e) => {
-                elements.threshValText.textContent = e.target.value;
-            });
-
-            elements.kernelSize.addEventListener('input', (e) => {
-                const val = e.target.value;
-                elements.kernelSizeVal.textContent = `${val}x${val}`;
-            });
-
-            // Preprocessing Toggle
-            elements.enablePreprocessing.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    elements.preprocessingControls.classList.remove('opacity-50', 'pointer-events-none');
-                } else {
-                    elements.preprocessingControls.classList.add('opacity-50', 'pointer-events-none');
-                }
-            });
-
-            // Threshold Type switch UI details
-            elements.thresholdType.addEventListener('change', (e) => {
-                const val = e.target.value;
-                if (val === 'adaptive' || val === 'otsu' || val === 'none') {
-                    elements.threshValContainer.classList.add('opacity-40', 'pointer-events-none');
-                } else {
-                    elements.threshValContainer.classList.remove('opacity-40', 'pointer-events-none');
+                    showError('Failed to initialize Cascade Classifier: ' + err);
                 }
             });
         }
 
-        async function startCamera() {
-            if (!cvReady) return;
+        function onOpenCvError() {
+            showError('Failed to load OpenCV.js engine. Please check internet connection.');
+        }
 
-            video = elements.webcam;
+        // Utility: Fetch cascade XML file and save into Virtual File System
+        function downloadCascadeModel(url, fileName, callback) {
+            let request = new XMLHttpRequest();
+            request.open('GET', url, true);
+            request.responseType = 'arraybuffer';
+            request.onload = function(e) {
+                if (request.status === 200) {
+                    let data = new Uint8Array(request.response);
+                    cv.FS_createDataFile('/', fileName, data, true, false, false);
+                    callback();
+                } else {
+                    showError('Failed to download cascade XML (HTTP ' + request.status + ')');
+                }
+            };
+            request.onerror = function() {
+                showError('Network error while downloading face detection model.');
+            };
+            request.send();
+        }
+
+        // Display Error helper
+        function showError(msg) {
+            console.error(msg);
+            const overlay = document.getElementById('canvasOverlay');
+            overlay.classList.remove('hidden');
+            document.getElementById('overlayMessage').innerText = msg;
+            document.getElementById('statusText').innerText = 'Error';
+            document.getElementById('statusBadge').className = 'flex items-center space-x-2 bg-rose-900/50 text-rose-300 border border-rose-700/50 px-3 py-1 rounded-full text-xs font-semibold';
+        }
+
+        // UI Parameter Listeners
+        document.getElementById('threshValue').addEventListener('input', (e) => {
+            document.getElementById('threshValueLabel').innerText = e.target.value;
+        });
+
+        document.getElementById('kernelSize').addEventListener('input', (e) => {
+            document.getElementById('kernelSizeLabel').innerText = `${e.target.value}x${e.target.value}`;
+        });
+
+        document.getElementById('scaleFactor').addEventListener('input', (e) => {
+            document.getElementById('scaleFactorLabel').innerText = parseFloat(e.target.value).toFixed(2);
+        });
+
+        document.getElementById('minNeighbors').addEventListener('input', (e) => {
+            document.getElementById('minNeighborsLabel').innerText = e.target.value;
+        });
+
+        document.getElementById('threshType').addEventListener('change', (e) => {
+            const isOtsu = e.target.value === 'OTSU';
+            document.getElementById('threshValContainer').style.opacity = isOtsu ? '0.4' : '1';
+        });
+
+        document.getElementById('toggleMirrorBtn').addEventListener('click', () => {
+            isMirrored = !isMirrored;
+            if (isMirrored) {
+                canvas.classList.add('mirror');
+            } else {
+                canvas.classList.remove('mirror');
+            }
+        });
+
+        // Toggle Camera Stream
+        document.getElementById('toggleCamBtn').addEventListener('click', async () => {
+            if (!isCameraActive) {
+                await startCamera();
+            } else {
+                stopCamera();
+            }
+        });
+
+        // Toggle Face Detection
+        document.getElementById('toggleDetectionBtn').addEventListener('click', () => {
+            isDetectionEnabled = !isDetectionEnabled;
+            const btn = document.getElementById('toggleDetectionBtn');
+            if (isDetectionEnabled) {
+                btn.className = 'bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition';
+                btn.innerHTML = '<i class="fa-solid fa-user-check"></i> Toggle Haar Cascade';
+            } else {
+                btn.className = 'bg-gray-700 hover:bg-gray-600 text-gray-300 px-5 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition';
+                btn.innerHTML = '<i class="fa-solid fa-user-slash"></i> Toggle Haar Cascade';
+            }
+        });
+
+        // Webcam stream initializer
+        async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
@@ -428,168 +354,145 @@
                 video.srcObject = stream;
                 await video.play();
 
-                // Allocate matrices once video sizes are known
-                video.width = video.videoWidth || 640;
-                video.height = video.videoHeight || 480;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
 
-                srcMat = new cv.Mat(video.height, video.width, cv.CV_8UC4);
-                grayMat = new cv.Mat(video.height, video.width, cv.CV_8UC1);
-                processedMat = new cv.Mat(video.height, video.width, cv.CV_8UC1);
-                facesMat = new cv.RectVector();
-
+                // Initialize OpenCV matrices
+                src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+                gray = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
+                processedMat = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
+                faces = new cv.RectVector();
                 cap = new cv.VideoCapture(video);
 
-                streaming = true;
-                elements.placeholderOverlay.classList.add('hidden');
+                isCameraActive = true;
+                document.getElementById('toggleCamBtn').innerHTML = '<i class="fa-solid fa-video-slash"></i> Stop Camera';
+                document.getElementById('toggleCamBtn').className = 'bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition';
 
-                // Start loop
-                requestAnimationFrame(processVideo);
-
+                // Request first frame processing
+                requestAnimationFrame(processVideoFrame);
             } catch (err) {
-                console.error("Camera access failed:", err);
-                alert("Error accessing webcam: " + err.message);
+                showError('Could not access webcam: ' + err.message);
             }
         }
 
         function stopCamera() {
-            streaming = false;
-            if (animFrameId) cancelAnimationFrame(animFrameId);
-            
-            if (video && video.srcObject) {
+            isCameraActive = false;
+            if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
-
             // Cleanup OpenCV matrices
-            if (srcMat) srcMat.delete();
-            if (grayMat) grayMat.delete();
+            if (src) src.delete();
+            if (gray) gray.delete();
             if (processedMat) processedMat.delete();
-            if (facesMat) facesMat.delete();
+            if (faces) faces.delete();
 
-            elements.placeholderOverlay.classList.remove('hidden');
-            elements.detectedCount.textContent = '0';
-            elements.fpsCounter.textContent = '0';
+            document.getElementById('toggleCamBtn').innerHTML = '<i class="fa-solid fa-video"></i> Start Camera';
+            document.getElementById('toggleCamBtn').className = 'bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('fpsVal').innerText = '0';
         }
 
-        function processVideo() {
-            if (!streaming) return;
+        // Main Processing Loop
+        function processVideoFrame() {
+            if (!isCameraActive) return;
 
-            const startTime = performance.now();
+            const now = performance.now();
+            frameCount++;
+            if (now - lastFrameTime >= 1000) {
+                currentFps = frameCount;
+                document.getElementById('fpsVal').innerText = currentFps;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
 
             try {
-                // 1. Capture current video frame into srcMat (RGBA)
-                cap.read(srcMat);
+                // 1. Read current video frame to RGBA matrix
+                cap.read(src);
 
-                // 2. Convert source image to Grayscale
-                cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY);
+                // 2. Convert to Grayscale
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-                // 3. Apply Morphological & Thresholding Preprocessing if enabled
-                const isPreprocessingActive = elements.enablePreprocessing.checked;
-                
-                if (isPreprocessingActive) {
-                    applyImagePipeline(grayMat, processedMat);
-                } else {
-                    grayMat.copyTo(processedMat);
+                // Copy gray to processedMat as working layer
+                gray.copyTo(processedMat);
+
+                // 3. Optional Thresholding
+                const enableThresh = document.getElementById('enableThreshold').checked;
+                if (enableThresh) {
+                    const threshTypeStr = document.getElementById('threshType').value;
+                    const threshVal = parseFloat(document.getElementById('threshValue').value);
+                    
+                    let typeFlag = cv.THRESH_BINARY;
+                    if (threshTypeStr === 'BINARY_INV') typeFlag = cv.THRESH_BINARY_INV;
+                    if (threshTypeStr === 'OTSU') typeFlag = cv.THRESH_BINARY | cv.THRESH_OTSU;
+
+                    cv.threshold(processedMat, processedMat, threshVal, 255, typeFlag);
                 }
 
-                // Render secondary preprocessed stream
-                cv.imshow('canvasProcessed', processedMat);
+                // 4. Optional Morphological Operations
+                const enableMorph = document.getElementById('enableMorph').checked;
+                if (enableMorph) {
+                    const morphOpType = document.getElementById('morphOp').value;
+                    const kSize = parseInt(document.getElementById('kernelSize').value);
+                    
+                    let M = cv.Mat.ones(kSize, kSize, cv.CV_8U);
+                    let anchor = new cv.Point(-1, -1);
 
-                // 4. Object Detection (Haar Cascade)
-                const scaleFactor = parseFloat(elements.scaleFactor.value);
-                const minNeighbors = parseInt(elements.minNeighbors.value);
-                const feedProcessed = elements.feedProcessedToCascade.checked && isPreprocessingActive;
+                    if (morphOpType === 'MORPH_ERODE') {
+                        cv.erode(processedMat, processedMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+                    } else if (morphOpType === 'MORPH_DILATE') {
+                        cv.dilate(processedMat, processedMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+                    } else if (morphOpType === 'MORPH_OPEN') {
+                        cv.morphologyEx(processedMat, processedMat, cv.MORPH_OPEN, M);
+                    } else if (morphOpType === 'MORPH_CLOSE') {
+                        cv.morphologyEx(processedMat, processedMat, cv.MORPH_CLOSE, M);
+                    }
+                    M.delete();
+                }
 
-                // Select matrix target for detection
-                const detectionTarget = feedProcessed ? processedMat : grayMat;
+                // 5. Choose matrix display output (Binary mask or source Color frame)
+                const showMaskOnly = document.getElementById('showMaskOnly').checked;
+                if (showMaskOnly) {
+                    cv.imshow('canvasOutput', processedMat);
+                } else {
+                    cv.imshow('canvasOutput', src);
+                }
 
-                // Run Cascade Classifier
-                classifier.detectMultiScale(detectionTarget, facesMat, scaleFactor, minNeighbors, 0);
+                // 6. Object Detection using Haar Cascade
+                if (isDetectionEnabled && classifier && !classifier.empty()) {
+                    const scaleFactor = parseFloat(document.getElementById('scaleFactor').value);
+                    const minNeighbors = parseInt(document.getElementById('minNeighbors').value);
+                    
+                    // Detect objects/faces on grayscale matrix (or preprocessed matrix)
+                    let detectTargetMat = (enableThresh || enableMorph) ? processedMat : gray;
+                    
+                    classifier.detectMultiScale(detectTargetMat, faces, scaleFactor, minNeighbors, 0, new cv.Size(30, 30));
 
-                // 5. Draw Bounding Boxes on main RGBA frame
-                if (elements.showBboxes.checked) {
-                    const color = new cv.Scalar(99, 102, 241, 255); // Indigo border
-                    for (let i = 0; i < facesMat.size(); ++i) {
-                        let face = facesMat.get(i);
-                        let point1 = new cv.Point(face.x, face.y);
-                        let point2 = new cv.Point(face.x + face.width, face.y + face.height);
-                        cv.rectangle(srcMat, point1, point2, color, 2);
+                    // Draw bounding boxes on Canvas overlay context
+                    for (let i = 0; i < faces.size(); ++i) {
+                        let face = faces.get(i);
+                        
+                        // Scale coordinates if needed based on rendering
+                        ctx.strokeStyle = '#10B981'; // Tailwind Emerald 500
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(face.x, face.y, face.width, face.height);
+
+                        // Label badge
+                        ctx.fillStyle = '#10B981';
+                        ctx.fillRect(face.x, face.y > 22 ? face.y - 22 : face.y, 85, 20);
+                        
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.fillText('Detected Face', face.x + 4, face.y > 22 ? face.y - 7 : face.y + 14);
                     }
                 }
 
-                // Update detection count UI
-                elements.detectedCount.textContent = facesMat.size();
-
-                // 6. Display main video output
-                cv.imshow('canvasOutput', srcMat);
-
-                // Calculate & display FPS
-                frameCount++;
-                const now = performance.now();
-                if (now - lastFrameTime >= 1000) {
-                    elements.fpsCounter.textContent = Math.round((frameCount * 1000) / (now - lastFrameTime));
-                    frameCount = 0;
-                    lastFrameTime = now;
-                }
-
             } catch (err) {
-                console.error("Frame processing error:", err);
+                console.error("Frame processing error: ", err);
             }
 
-            if (streaming) {
-                animFrameId = requestAnimationFrame(processVideo);
-            }
-        }
-
-        // Apply Threshold and Morphological transforms
-        function applyImagePipeline(inputGray, outputMat) {
-            let tempMat = inputGray.clone();
-
-            // A. Thresholding Operations
-            const threshType = elements.thresholdType.value;
-            const threshVal = parseFloat(elements.threshVal.value);
-
-            if (threshType === 'binary') {
-                cv.threshold(tempMat, tempMat, threshVal, 255, cv.THRESH_BINARY);
-                elements.preprocessTag.textContent = "Binary Thresh";
-            } else if (threshType === 'binary_inv') {
-                cv.threshold(tempMat, tempMat, threshVal, 255, cv.THRESH_BINARY_INV);
-                elements.preprocessTag.textContent = "Binary Inv";
-            } else if (threshType === 'otsu') {
-                cv.threshold(tempMat, tempMat, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
-                elements.preprocessTag.textContent = "Otsu";
-            } else if (threshType === 'adaptive') {
-                cv.adaptiveThreshold(tempMat, tempMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
-                elements.preprocessTag.textContent = "Adaptive";
-            } else {
-                elements.preprocessTag.textContent = "Grayscale";
-            }
-
-            // B. Morphological Operations
-            const morphType = elements.morphType.value;
-            const kSize = parseInt(elements.kernelSize.value);
-
-            if (morphType !== 'none') {
-                let M = cv.Mat.ones(kSize, kSize, cv.CV_8U);
-                let anchor = new cv.Point(-1, -1);
-
-                if (morphType === 'erode') {
-                    cv.erode(tempMat, tempMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-                } else if (morphType === 'dilate') {
-                    cv.dilate(tempMat, tempMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-                } else if (morphType === 'open') {
-                    cv.morphologyEx(tempMat, tempMat, cv.MORPH_OPEN, M);
-                } else if (morphType === 'close') {
-                    cv.morphologyEx(tempMat, tempMat, cv.MORPH_CLOSE, M);
-                }
-                M.delete();
-            }
-
-            tempMat.copyTo(outputMat);
-            tempMat.delete();
+            // Loop next frame
+            requestAnimationFrame(processVideoFrame);
         }
     </script>
-
-    <!-- Load OpenCV.js asynchronously -->
-    <script async src="https://docs.opencv.org/4.7.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
 </body>
 </html>
